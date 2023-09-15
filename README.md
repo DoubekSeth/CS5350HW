@@ -1,3 +1,3 @@
 # CS5350
-Code for all my homework in CS 5350 Machine Learning
-* HW1 - Decision Trees
+This is a machine learning library developed by Seth Doubek for
+CS5350/6350 in University of Utah
