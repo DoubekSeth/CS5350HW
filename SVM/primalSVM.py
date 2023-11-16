@@ -14,7 +14,7 @@ def add_bias_term_to_df(df):
         df.insert(columns-1, "Bias Term", ones, False)
 
 def primalSVM(training, epochs):
-    gamma = 0.1
+    gamma = 0.01
     C = 500/873
     N = training.shape[0]
     #Add bias term to dataframe
@@ -39,6 +39,7 @@ def primalSVM(training, epochs):
                 w = w - gamma*(w_bias_0) + gamma*C*N*y*x
             else:
                 w = (1-gamma)*w_bias_0
+        print("Training acc:", evaluate_perceptron(training, w))
     return w
 
 def evaluate_perceptron(testing, weights):
