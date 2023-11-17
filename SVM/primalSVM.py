@@ -14,8 +14,8 @@ def add_bias_term_to_df(df):
         df.insert(columns-1, "Bias Term", ones, False)
 
 def primalSVM(training, epochs):
-    gamma = 0.01
-    C = 500/873
+    gamma_0 = 0.001
+    C = 700/873
     N = training.shape[0]
     #Add bias term to dataframe
     add_bias_term_to_df(training)
@@ -23,6 +23,7 @@ def primalSVM(training, epochs):
     w = np.zeros(training.shape[1]-1)
     for epoch in range(0, epochs):
         print(epoch)
+        gamma = secondSchedule(gamma_0=gamma_0, t=epoch)
         #First, shuffle training
         shuffled_training = training.sample(frac=1)
         #For training examples
@@ -38,8 +39,8 @@ def primalSVM(training, epochs):
             if(y*np.dot(w, x)<=1):
                 w = w - gamma*(w_bias_0) + gamma*C*N*y*x
             else:
-                w = (1-gamma)*w_bias_0
-        print("Training acc:", evaluate_perceptron(training, w))
+                w = w-gamma*w_bias_0
+        #print("Training acc:", evaluate_perceptron(training, w))
     return w
 
 def evaluate_perceptron(testing, weights):
@@ -53,6 +54,13 @@ def evaluate_perceptron(testing, weights):
             correct += 1
     return correct/testing.shape[0]
 
-trained_weights = primalSVM(bank_note_testing, 20)
+def firstSchedule(gamma_0, alpha, t):
+    return gamma_0/(1+gamma_0/alpha*t)
+
+def secondSchedule(gamma_0, t):
+    return gamma_0/(1+t)
+trained_weights = primalSVM(bank_note_training, 100)
+print(evaluate_perceptron(bank_note_training, trained_weights))
 acc = evaluate_perceptron(bank_note_testing, trained_weights)
 print(acc)
+#print(trained_weights)
