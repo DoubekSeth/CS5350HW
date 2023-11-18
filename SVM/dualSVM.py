@@ -13,9 +13,8 @@ def add_bias_term_to_df(df):
     if("Bias Term" not in df.columns):
         df.insert(columns-1, "Bias Term", ones, False)
 
-def 
 
-def dualSVM(training, epochs, C):
+def dualSVM(training, epochs, kernel, C):
     gamma_0 = 0.01
     N = training.shape[0]
     #Add bias term to dataframe
@@ -24,25 +23,16 @@ def dualSVM(training, epochs, C):
     w = np.zeros(training.shape[1]-1)
     for epoch in range(0, epochs):
         #print(epoch)
-        gamma = firstSchedule(gamma_0=gamma_0, alpha=0.05, t=epoch)
+        gamma = gamma_0
         #First, shuffle training
         shuffled_training = training.sample(frac=1)
-        #For training examples
-        for index, row in shuffled_training.iterrows():
-            x = row.iloc[:len(row)-1]
-            y = 2*row.iloc[-1]-1
-            w_bias_0 = np.copy(w)
-            w_bias_0[-1] = 0
-            #print("X", x)
-            #print("Y", y)
-            #print("W", w)
-            #print("Pred", y*np.dot(w, x))
-            if(y*np.dot(w, x)<=1):
-                w = w - gamma*(w_bias_0) + gamma*C*N*y*x
-            else:
-                w = w-gamma*w_bias_0
-        #print("Training acc:", evaluate_perceptron(training, w))
+        #For training examples, find optimal values
+        kernelMatrix = np.fromfunction(np.vectorize(lambda i, j: kernel(training.iloc[int(i)], training.iloc[int(j)])), (training.shape[0], training.shape[0]))
+        print(kernelMatrix)
     return w
+
+def noKernel(a, b):
+    return np.dot(a, b)
 
 def evaluate_perceptron(testing, weights):
     correct = 0
@@ -55,17 +45,17 @@ def evaluate_perceptron(testing, weights):
             correct += 1
     return correct/testing.shape[0]
 
-
-for i in range(0, 3):
-    if(i == 0):
-        C = 100/873
-    if(i == 1):
-        C = 500/873
-    if(i == 2):
-        C = 700/873
-    print(i)
-    trained_weights = primalSVM(bank_note_training, 100, C=C)
-    print(evaluate_perceptron(bank_note_training, trained_weights))
-    acc = evaluate_perceptron(bank_note_testing, trained_weights)
-    print(acc)
-    print(trained_weights)
+print(dualSVM(bank_note_testing, 1, noKernel, C=1))
+# for i in range(0, 3):
+#     if(i == 0):
+#         C = 100/873
+#     if(i == 1):
+#         C = 500/873
+#     if(i == 2):
+#         C = 700/873
+#     print(i)
+#     trained_weights = primalSVM(bank_note_training, 100, C=C)
+#     print(evaluate_perceptron(bank_note_training, trained_weights))
+#     acc = evaluate_perceptron(bank_note_testing, trained_weights)
+#     print(acc)
+#     print(trained_weights)
