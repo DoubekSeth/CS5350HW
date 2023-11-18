@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy import optimize
 
 attributes = ["VoW", "SoW", "CoW", "Entropy", "Label"]
 bank_note_training = pd.read_csv("https://raw.githubusercontent.com/DoubekSeth/ToyDatasets/main/bank-note/train.csv", header=None, names=attributes)
@@ -15,37 +16,49 @@ def add_bias_term_to_df(df):
 
 
 def dualSVM(training, epochs, kernel, C):
-    gamma_0 = 0.01
-    N = training.shape[0]
     #Add bias term to dataframe
     add_bias_term_to_df(training)
     #Initialize weights to 0
     w = np.zeros(training.shape[1]-1)
-    for epoch in range(0, epochs):
-        #print(epoch)
-        gamma = gamma_0
-        #First, shuffle training
-        shuffled_training = training.sample(frac=1)
-        #For training examples, find optimal values
-        kernelMatrix = np.fromfunction(np.vectorize(lambda i, j: kernel(training.iloc[int(i)], training.iloc[int(j)])), (training.shape[0], training.shape[0]))
-        print(kernelMatrix)
-    return w
+    y_vec = 2*training["Label"]-1
+    #For training examples, find optimal values
+    kernelMatrix = np.fromfunction(np.vectorize(lambda i, j: kernel(training.iloc[int(i)], training.iloc[int(j)])), (training.shape[0], training.shape[0]))
+
+    def objective_function(X):
+        return 0.5*np.sum(np.dot(kernelMatrix * np.array((y_vec * X))[:, np.newaxis], y_vec*X))-np.sum(X)
+
+    bounds = optimize.Bounds(lb=0, ub=C)
+
+    def mutualSlack(X):
+            return np.dot(X, y_vec)-0
+        
+    constraint_dict = {'type': 'eq', 'fun':mutualSlack}
+
+    initial_guess = np.zeros(len(y_vec))
+
+    result = optimize.minimize(objective_function, initial_guess, method="SLSQP", constraints=constraint_dict, bounds=bounds)["x"]
+    print(result)
+
+    return result
 
 def noKernel(a, b):
     return np.dot(a, b)
 
-def evaluate_perceptron(testing, weights):
+def evaluate_dualSVM(testing, training, alphas):
     correct = 0
     add_bias_term_to_df(testing)
     for index, row in testing.iterrows():
         label = row.iloc[-1]
         data = row.iloc[:len(row)-1]
-        prediction = np.dot(weights, data)
+        prediction = sgn(alphas*training*np.fromfunction(lambda i, j: kernel(training)))
         if((2*label-1)*prediction > 0):
             correct += 1
     return correct/testing.shape[0]
 
-print(dualSVM(bank_note_testing, 1, noKernel, C=1))
+def sgn(x):
+    return 1 if x >= 0 else -1
+
+print(dualSVM(bank_note_training, 1, noKernel, C=10))
 # for i in range(0, 3):
 #     if(i == 0):
 #         C = 100/873
