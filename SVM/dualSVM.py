@@ -69,27 +69,11 @@ def recover_weights(alphas, training):
     w = np.sum(x_vec * np.array((y_vec * alphas))[:, np.newaxis], axis=0)
     return w
 
-for i in range(0, 3):
-    if(i == 0):
-        C = 100/873
-    if(i == 1):
-        C = 500/873
-    if(i == 2):
-        C = 700/873
-    for j in range(0, 5):
-        if(j == 0):
-            gamma = 0.1
-        if(j == 1):
-            gamma = 0.5
-        if(j == 2):
-            gamma = 1
-        if(j == 3):
-            gamma = 5
-        if(j == 4):
-            gamma = 100
-        print(C, gamma)
-        alphas = dualSVM(bank_note_training, gaussiankernel, C=C, gamma=gamma)
-        print("Testing Error", evaluate_dualSVM(testing=bank_note_testing, training=bank_note_training, alphas=alphas, kernel=gaussiankernel, gamma=gamma))
-        print("Training Error", evaluate_dualSVM(testing=bank_note_training, training=bank_note_training, alphas=alphas, kernel=gaussiankernel, gamma=gamma))
-        print("Number of support vectors", np.count_nonzero(alphas))
-    #print(recover_weights(alphas, bank_note_training))
+
+C = 700/873
+gamma = 100
+print("Starting Dual SVM, this might take 3-5 mins to run")
+alphas = dualSVM(bank_note_training, noKernel, C=C, gamma=gamma)
+print("Testing Error", evaluate_dualSVM(testing=bank_note_testing, training=bank_note_training, alphas=alphas, kernel=noKernel, gamma=gamma))
+print("Training Error", evaluate_dualSVM(testing=bank_note_training, training=bank_note_training, alphas=alphas, kernel=noKernel, gamma=gamma))
+print("Number of support vectors", np.count_nonzero(alphas))
