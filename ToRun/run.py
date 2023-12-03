@@ -1,10 +1,16 @@
+# %% [markdown]
+# All Imports, including data
+
+# %%
 import numpy as np
 import pandas as pd
 
+# %%
 attributes = ["VoW", "SoW", "CoW", "Entropy", "Label"]
 bank_note_training = pd.read_csv("https://raw.githubusercontent.com/DoubekSeth/ToyDatasets/main/bank-note/train.csv", header=None, names=attributes)
 bank_note_testing = pd.read_csv("https://raw.githubusercontent.com/DoubekSeth/ToyDatasets/main/bank-note/test.csv", header=None, names=attributes)
 
+# %%
 def add_bias_term_to_df(df):
     rows = df.shape[0]
     columns = df.shape[1]
@@ -13,136 +19,150 @@ def add_bias_term_to_df(df):
     if("Bias Term" not in df.columns):
         df.insert(columns-1, "Bias Term", ones, False)
 
-def primalSVM(training, epochs, C):
-    gamma_0 = 0.01
-    N = training.shape[0]
-    #Add bias term to dataframe
-    add_bias_term_to_df(training)
-    #Initialize weights to 0
-    w = np.zeros(training.shape[1]-1)
-    for epoch in range(0, epochs):
-        #print(epoch)
-        gamma = firstSchedule(gamma_0=gamma_0, alpha=0.05, t=epoch)
-        #First, shuffle training
-        shuffled_training = training.sample(frac=1)
-        #For training examples
-        for index, row in shuffled_training.iterrows():
-            x = row.iloc[:len(row)-1]
-            y = 2*row.iloc[-1]-1
-            w_bias_0 = np.copy(w)
-            w_bias_0[-1] = 0
-            #print("X", x)
-            #print("Y", y)
-            #print("W", w)
-            #print("Pred", y*np.dot(w, x))
-            if(y*np.dot(w, x)<=1):
-                w = w - gamma*(w_bias_0) + gamma*C*N*y*x
-            else:
-                w = w-gamma*w_bias_0
-        #print("Training acc:", evaluate_perceptron(training, w))
-    return w
+# %%
+def createWeights0(hiddenLayer1, hiddenLayer2, data):
+    add_bias_term_to_df(data)
+    columns = data.shape[1]-1#Minus 1 from y labels
+    weights = {}
+    for i in range(1, hiddenLayer1):
+        weights["0"+str(i)] = np.zeros(columns)
+    for j in range(1, hiddenLayer2):
+        weights["1"+str(j)] = np.zeros(hiddenLayer1)
+    weights["21"] = np.zeros(hiddenLayer2)
+    return weights
 
-def evaluate_perceptron(testing, weights):
-    correct = 0
-    add_bias_term_to_df(testing)
-    for index, row in testing.iterrows():
-        label = row.iloc[-1]
-        data = row.iloc[:len(row)-1]
-        prediction = np.dot(weights, data)
-        if((2*label-1)*prediction > 0):
-            correct += 1
-    return correct/testing.shape[0]
+# %%
+def createWeightsNormal(hiddenLayer1, hiddenLayer2, data):
+    add_bias_term_to_df(data)
+    columns = data.shape[1]-1#Minus 1 from y labels
+    weights = {}
+    for i in range(1, hiddenLayer1):
+        weights["0"+str(i)] = np.random.randn(columns)
+    for j in range(1, hiddenLayer2):
+        weights["1"+str(j)] = np.random.randn(hiddenLayer1)
+    weights["21"] = np.random.randn(hiddenLayer2)
+    return weights
 
-def firstSchedule(gamma_0, alpha, t):
+# %%
+def sigmoid(x):
+    return 1/(1+np.power(np.e, -x))
+
+# %%
+def backProp(pred, label, weights, firstLayerNodes, secondLayerNodes, hiddenLayer1, hiddenLayer2, data):
+    columns = data.shape[0]
+    wGrads = {}
+    nodeGrads = {}
+    #First pass
+    nodeGrads["y"] = (pred - label) #dL/dy
+    wGrads["21"] = nodeGrads["y"]*secondLayerNodes #dL/dw2
+    #Second pass
+    nodeGrads["2"] = nodeGrads["y"]*weights["21"] #dL/dZ2
+    for i in range(1, hiddenLayer2):
+        wGrads["1"+str(i)] = nodeGrads["2"][i]*secondLayerNodes[i]*(1-secondLayerNodes[i])*firstLayerNodes #dL/dw1
+    #Third pass
+    for j in range(1, hiddenLayer1):
+        nodeGrads["1"+str(j)] = np.dot(np.multiply(nodeGrads["2"], np.multiply(secondLayerNodes, 1-secondLayerNodes))[1:], [weights["1"+str(a)][j] for a in range(1, hiddenLayer2)]) #dL/dZ1
+    for k in range(1, hiddenLayer1):
+        wGrads["0"+str(k)] = nodeGrads["1"+str(k)]*firstLayerNodes[k]*(1-firstLayerNodes[k])*np.array(data)
+    return wGrads
+
+# %%
+def learningRate(gamma_0, alpha, t):
     return gamma_0/(1+gamma_0/alpha*t)
 
-def secondSchedule(gamma_0, t):
-    return gamma_0/(1+t)
-
-print("Starting primal SVM")
-C = 500/873
-trained_weights = primalSVM(bank_note_training, 20, C=C)
-print("Training Accuracy:", evaluate_perceptron(bank_note_training, trained_weights))
-acc = evaluate_perceptron(bank_note_testing, trained_weights)
-print("Testing Accuracy:", acc)
-print("Weights", trained_weights)
-
-import numpy as np
-import pandas as pd
-from scipy import optimize
-
-attributes = ["VoW", "SoW", "CoW", "Entropy", "Label"]
-bank_note_training = pd.read_csv("https://raw.githubusercontent.com/DoubekSeth/ToyDatasets/main/bank-note/train.csv", header=None, names=attributes)
-bank_note_testing = pd.read_csv("https://raw.githubusercontent.com/DoubekSeth/ToyDatasets/main/bank-note/test.csv", header=None, names=attributes)
-
-def add_bias_term_to_df(df):
-    rows = df.shape[0]
-    columns = df.shape[1]
-    ones = np.ones(rows)
-    #Need to check if actually need to insert
-    if("Bias Term" not in df.columns):
-        df.insert(columns-1, "Bias Term", ones, False)
+# %%
+def evaluateNN(DF, weights, hiddenLayer1, hiddenLayer2):
+    add_bias_term_to_df(DF)
+    count = 0
+    for index, row in DF.iterrows():
+        label = row.iloc[-1]
+        data = row.iloc[:len(row)-1]
+        #Now, start the passes
+        firstLayerNodes = np.ones(1)
+        for i in range(1, hiddenLayer1):
+            w = weights["0"+str(i)]
+            firstLayerNodes = np.append(firstLayerNodes, sigmoid(np.dot(w, data)))
+        #Second Pass
+        secondLayerNodes = np.ones(1)
+        for j in range(1, hiddenLayer2):
+            w = weights["1"+str(j)]
+            secondLayerNodes = np.append(secondLayerNodes, sigmoid(np.dot(w, firstLayerNodes)))
+        #Final pass
+        pred = np.dot(weights["21"], secondLayerNodes)
+        if(pred < 0.5 and label == 0 or pred >= 0 and label == 1):
+            count += 1
+    return count/DF.shape[0]
 
 
-def dualSVM(training, kernel, C, gamma=1):
-    #Add bias term to dataframe
-    add_bias_term_to_df(training)
-    #Initialize weights to 0
-    y_vec = 2*training["Label"]-1
-    #For training examples, find optimal values
-    kernelMatrix = np.fromfunction(np.vectorize(lambda i, j: kernel(training.iloc[int(i), :training.shape[1]-1], training.iloc[int(j), :training.shape[1]-1])), (training.shape[0], training.shape[0]))
+# %%
+def evaluateLossNN(DF, weights, hiddenLayer1, hiddenLayer2):
+    add_bias_term_to_df(DF)
+    losses = 0
+    for index, row in DF.iterrows():
+        label = row.iloc[-1]
+        data = row.iloc[:len(row)-1]
+        #Now, start the passes
+        firstLayerNodes = np.ones(1)
+        for i in range(1, hiddenLayer1):
+            w = weights["0"+str(i)]
+            firstLayerNodes = np.append(firstLayerNodes, sigmoid(np.dot(w, data)))
+        #Second Pass
+        secondLayerNodes = np.ones(1)
+        for j in range(1, hiddenLayer2):
+            w = weights["1"+str(j)]
+            secondLayerNodes = np.append(secondLayerNodes, sigmoid(np.dot(w, firstLayerNodes)))
+        #Final pass
+        pred = np.dot(weights["21"], secondLayerNodes)
+        l = 0.5*(pred-label)**2
+        losses += l
+    return losses
 
-    def objective_function(X):
-        return 0.5*np.sum(np.dot(kernelMatrix * np.array((y_vec * X))[:, np.newaxis], y_vec*X))-np.sum(X)
+# %%
+def forwardPass(DF, weights, T, gamma_0, alpha, hiddenLayer1, hiddenLayer2, updateWeights=True, learningRate=learningRate):
+    add_bias_term_to_df(DF)
+    for epoch in range(T):
+        #print(epoch)
+        shuffled_data = DF.sample(frac=1)
+        for index, row in shuffled_data.iterrows():
+            label = row.iloc[-1]
+            data = row.iloc[:len(row)-1]
+            #Now, start the passes
+            firstLayerNodes = np.ones(1)
+            for i in range(1, hiddenLayer1):
+                w = weights["0"+str(i)]
+                firstLayerNodes = np.append(firstLayerNodes, sigmoid(np.dot(w, data)))
+            #Second Pass
+            secondLayerNodes = np.ones(1)
+            for j in range(1, hiddenLayer2):
+                w = weights["1"+str(j)]
+                secondLayerNodes = np.append(secondLayerNodes, sigmoid(np.dot(w, firstLayerNodes)))
+            #Final pass
+            pred = np.dot(weights["21"], secondLayerNodes)
+            if(updateWeights):
+                gradient = backProp(pred, label, weights, firstLayerNodes, secondLayerNodes, hiddenLayer1, hiddenLayer2, data)
+                #update weights
+                for key in weights:
+                    weights[key] = weights[key] - learningRate(gamma_0, alpha, index)*gradient[key]
+        #print(evaluateLossNN(DF, weights, hiddenLayer1, hiddenLayer2))
+    return weights
 
-    bounds = optimize.Bounds(lb=0, ub=C)
+# %%
+data = bank_note_training
+for i in range(0, 3):
+    if(i == 0):
+        hiddenLayer1 = 5
+        hiddenLayer2 = 5
+    if(i == 1):
+        hiddenLayer1 = 10
+        hiddenLayer2 = 10
+    if(i == 2):
+        hiddenLayer1 = 25
+        hiddenLayer2 = 25
+    print("Neural Network Width:", hiddenLayer1)
 
-    def mutualSlack(X):
-        return np.dot(X, y_vec)-0
-        
-    constraint_dict = {'type': 'eq', 'fun':mutualSlack}
-
-    initial_guess = np.zeros(len(y_vec))
-
-    result = optimize.minimize(objective_function, initial_guess, method="SLSQP", constraints=constraint_dict, bounds=bounds)["x"]
-    #Set all alphas close to 0 to 0
-    epsilon = 0.00000001
-    result[result < epsilon] = 0
-    return result
-
-def noKernel(a, b):
-    return np.dot(a, b)
-
-def gaussiankernel(a, b, c):
-    return np.e**(-(np.linalg.norm(a-b)**2)/c)
-
-def evaluate_dualSVM(testing, training, alphas, kernel, gamma=1):
-    correct = 0
-    add_bias_term_to_df(testing)
-    add_bias_term_to_df(training)
-    test_y = 2*testing["Label"]-1
-    #Create kernel matrix
-    kernelMatrix = np.fromfunction(np.vectorize(lambda i, j: kernel(training.iloc[int(i), :training.shape[1]-1], testing.iloc[int(j), :testing.shape[1]-1])), (training.shape[0], testing.shape[0]))
-    alphayis = alphas*(2*training["Label"]-1)
-    vecsgn = np.vectorize(sgn)
-    predictions = vecsgn(np.dot(alphayis, kernelMatrix))
-    errs = 0.5*np.sum(np.abs(predictions-test_y))
-    return (testing.shape[0]-errs)/testing.shape[0]
-
-def sgn(x):
-    return 1 if x >= 0 else -1
-
-def recover_weights(alphas, training):
-    y_vec = 2*training["Label"]-1
-    x_vec = training[["VoW", "SoW", "CoW", "Entropy", "Bias Term"]]
-    w = np.sum(x_vec * np.array((y_vec * alphas))[:, np.newaxis], axis=0)
-    return w
+    weights = createWeightsNormal(hiddenLayer1, hiddenLayer2, data)
+    learnedWeights = forwardPass(data, weights, 10, 0.1, 25, hiddenLayer1, hiddenLayer2)
+    print("Training:", evaluateNN(bank_note_training, learnedWeights, hiddenLayer1, hiddenLayer2))
+    print("Testing:", evaluateNN(bank_note_testing, learnedWeights, hiddenLayer1, hiddenLayer2))
 
 
-C = 700/873
-gamma = 100
-print("Starting Dual SVM, this might take 3-5 mins to run")
-alphas = dualSVM(bank_note_training, noKernel, C=C, gamma=gamma)
-print("Testing Error", evaluate_dualSVM(testing=bank_note_testing, training=bank_note_training, alphas=alphas, kernel=noKernel, gamma=gamma))
-print("Training Error", evaluate_dualSVM(testing=bank_note_training, training=bank_note_training, alphas=alphas, kernel=noKernel, gamma=gamma))
-print("Number of support vectors", np.count_nonzero(alphas))
